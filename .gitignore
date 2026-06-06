@@ -1,0 +1,17 @@
+# Python virtual environment
+.venv/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.fls
+*.fdb_latexmk
+
+# Python script (secondary artifact)
+generate_paper.py
+
+# Word doc (secondary artifact)
+*.docx
