@@ -116,24 +116,24 @@ integrated gradients, model interpretability
 
 \section{Introduction}
 
-The rapid adoption of machine learning (ML) across high-stakes domains---including
-healthcare, finance, and criminal justice---has intensified demands for model
+The rapid adoption of machine learning (ML) across high-stakes domains (including
+healthcare, finance, and criminal justice) has intensified demands for model
 transparency and accountability. As Lipton (2018) notes, interpretability in ML
 is not a singular concept but a multidimensional property that encompasses
 simulatability, decomposability, and algorithmic transparency. The field of
 Explainable AI (XAI) addresses these concerns by providing human-understandable
 explanations for model predictions, helping practitioners identify bias, validate
 model behavior, and build trust with end-users (Doshi-Velez \& Kim, 2017). As
-Philip (2019) observes, XAI can adopt either model-agnostic approaches---treating
-the model as a black box---or model-specific approaches that exploit the internal
+Philip (2019) observes, XAI can adopt either model-agnostic approaches (treating
+the model as a black box) or model-specific approaches that exploit the internal
 structure of a known algorithm; each carries distinct tradeoffs in scope,
 computational cost, and explanatory fidelity.
 
 This paper documents a hands-on exploration of XAI principles through Google
 Cloud's Vertex AI platform. The primary objective was to implement feature
 attribution explanations for a binary classification model, experiment with key
-XAI configuration parameters---specifically the number of integral approximation
-steps and the number of paths---and assess the resulting tradeoffs. The exercise
+XAI configuration parameters (specifically the number of integral approximation
+steps and the number of paths) and assess the resulting tradeoffs. The exercise
 followed the ``Getting Explanations Locally in Notebook'' workflow and the Vertex
 Pipelines framework for MLOps orchestration (Google Cloud, 2026a; Google Cloud,
 2026b).
@@ -147,8 +147,8 @@ additional configuration to access interpretability tooling at the depth provide
 natively by Vertex AI. SageMaker Clarify provides bias and explainability
 reporting, yet its feature attribution methods are less tightly integrated with
 pipeline orchestration than Vertex AI Pipelines. Google Cloud's Vertex AI was
-ultimately selected due to its comprehensive, unified suite of ML capabilities---
-AutoML, custom training, model deployment, and built-in Explainable AI---reducing
+ultimately selected due to its comprehensive, unified suite of ML capabilities
+(AutoML, custom training, model deployment, and built-in Explainable AI), reducing
 the infrastructure burden typically associated with managing disparate ML tooling.
 Vertex AI Pipelines supports reproducible DAG-based workflows via the Kubeflow
 Pipelines SDK, enabling experiment tracking, artifact lineage, and iterative
@@ -176,7 +176,7 @@ readmitted within 30 days versus not readmitted). Eight numeric clinical feature
 were selected: patient age midpoint, time in hospital, number of lab procedures,
 number of non-lab procedures, number of medications, prior inpatient visits,
 prior emergency visits, and number of diagnoses. The dataset exhibits marked class
-imbalance---11.2\% of encounters result in 30-day readmission---making metric
+imbalance (11.2\% of encounters result in 30-day readmission), making metric
 selection particularly consequential. Random oversampling of the minority class
 was applied to the training set to address this imbalance.
 
@@ -187,8 +187,8 @@ was therefore adopted. The area under the receiver operating characteristic curv
 discriminative ability across all classification thresholds, making it robust to
 class imbalance (Lundberg \& Lee, 2017). Precision and recall were monitored
 independently to understand the cost-asymmetric nature of false positives versus
-false negatives in a clinical context. The F1-score---the harmonic mean of
-precision and recall---provided a balanced single summary for comparing model
+false negatives in a clinical context. The F1-score (the harmonic mean of
+precision and recall) provided a balanced single summary for comparing model
 variants. Calibrated log-loss was also tracked to assess probabilistic calibration,
 which is critical when model output probabilities inform clinical triage decisions.
 
@@ -291,7 +291,7 @@ recommended 200-step configuration.}
 \subsection{Sampled Shapley: Varying the Number of Paths}
 
 A secondary experiment used SHAP KernelExplainer with \texttt{nsamples} of 10,
-30, and 50---the direct analogue of the Vertex AI Sampled Shapley
+30, and 50, the direct analogue of the Vertex AI Sampled Shapley
 \texttt{num\_paths} parameter (Ribeiro et al., 2016). L2 distance from the exact
 TreeExplainer result was 0.370 at $n = 10$, 0.363 at $n = 30$, and 0.356 at
 $n = 50$, showing steady convergence as paths increase. The non-trivial residual
@@ -326,7 +326,7 @@ beyond the other clinical predictors.}
 \section{Lessons Learned and Future Pipeline Implications}
 
 Several important lessons emerged from this exploration. First, the AUC-ROC of
-0.65 on the real UCI dataset---with severe 11.2\% class imbalance---highlights
+0.65 on the real UCI dataset, with severe 11.2\% class imbalance, highlights
 that standard metrics alone are insufficient for imbalanced clinical prediction.
 XAI revealed that \texttt{number\_inpatient} dominated predictions (mean
 $|\text{SHAP}| = 0.320$) while \texttt{num\_procedures} and
@@ -345,9 +345,9 @@ diagnostic complement to standard evaluation metrics, not a substitute.
 Third, the comparison between the best GBM (AUC-ROC 0.64) and the MLP (AUC-ROC 0.62)
 highlighted a performance-interpretability tradeoff: the MLP was required for
 Integrated Gradients due to its smooth output surface, yet it performed slightly
-worse. Future pipelines should incorporate both model types in parallel---the
+worse. Future pipelines should incorporate both model types in parallel: the
 best-performing model for prediction and a differentiable surrogate for
-IG-based attribution---so that neither predictive performance nor explanatory
+IG-based attribution, so that neither predictive performance nor explanatory
 fidelity is sacrificed. Platform vendor lock-in, illustrated by the deprecation
 of Vertex Explainable AI, further reinforces the need for open-standard tools
 such as SHAP (Lundberg \& Lee, 2017) that remain portable and independent of
