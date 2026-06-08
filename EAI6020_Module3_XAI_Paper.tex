@@ -168,12 +168,17 @@ production use.
 
 \section{Selection of Predictive Model Evaluation Metrics}
 
-For this exercise, a binary classification model was trained on a synthetic
-hospital readmission dataset comprising 3{,}000 patient records and eight clinical
-features, including a deliberately injected artifact (\texttt{day\_of\_week}) to
-test whether XAI could surface spurious correlations. Healthcare readmission
-prediction was chosen for its high interpretability demands: clinicians must
-understand the factors driving a prediction before acting on it.
+For this exercise, a binary classification model was trained on the publicly
+available UCI Diabetes 130-US Hospitals dataset (Strack et al., 2014), which
+contains 101{,}766 de-identified patient encounters across 130 US hospitals from
+1999 to 2008. The prediction target was 30-day hospital readmission (binary:
+readmitted within 30 days versus not readmitted). Eight numeric clinical features
+were selected: patient age midpoint, time in hospital, number of lab procedures,
+number of non-lab procedures, number of medications, prior inpatient visits,
+prior emergency visits, and number of diagnoses. The dataset exhibits marked class
+imbalance---11.2\% of encounters result in 30-day readmission---making metric
+selection particularly consequential. Random oversampling of the minority class
+was applied to the training set to address this imbalance.
 
 Given the class imbalance typical of healthcare datasets, accuracy alone is an
 insufficient and potentially misleading metric. A multi-metric evaluation framework
@@ -187,13 +192,15 @@ precision and recall---provided a balanced single summary for comparing model
 variants. Calibrated log-loss was also tracked to assess probabilistic calibration,
 which is critical when model output probabilities inform clinical triage decisions.
 
-The baseline Gradient Boosting Classifier achieved an AUC-ROC of 0.68, an
-F1-score of 0.76, precision of 0.72, recall of 0.80, and log-loss of 0.62 on the
-holdout test set. An automated grid search (the analogue of Vertex AI AutoML)
-identified optimal parameters (\texttt{learning\_rate = 0.05},
-\texttt{max\_depth = 3}, \texttt{n\_estimators = 100}), yielding a best GBM with
-AUC-ROC of 0.69, F1-score of 0.78, precision of 0.73, recall of 0.83, and
-log-loss of 0.60---a modest but consistent improvement across all metrics.
+The baseline Gradient Boosting Classifier achieved an AUC-ROC of 0.65, an
+F1-score of 0.25, precision of 0.17, recall of 0.56, and log-loss of 0.65 on
+the holdout test set. An automated grid search (the analogue of Vertex AI AutoML)
+identified optimal parameters (\texttt{learning\_rate = 0.1},
+\texttt{max\_depth = 5}, \texttt{n\_estimators = 200}), yielding a best GBM with
+AUC-ROC of 0.64, F1-score of 0.25, precision of 0.17, recall of 0.53, and
+log-loss of 0.63. The similar performance between the two configurations reflects
+a performance ceiling imposed by the feature set rather than inadequate
+hyperparameter tuning.
 
 A supplementary Multi-Layer Perceptron (MLP, AUC-ROC = 0.66) was trained for
 Integrated Gradients experiments, as IG requires a smooth differentiable output
@@ -208,16 +215,16 @@ unavailable from piecewise-constant tree models.
 \toprule
 \textbf{Metric} & \textbf{Baseline GBM} & \textbf{Best GBM (Grid Search)} \\
 \midrule
-AUC-ROC   & 0.68 & 0.69 \\
-F1-Score  & 0.76 & 0.78 \\
-Precision & 0.72 & 0.73 \\
-Recall    & 0.80 & 0.83 \\
-Log-Loss  & 0.62 & 0.60 \\
+AUC-ROC   & 0.65 & 0.64 \\
+F1-Score  & 0.25 & 0.25 \\
+Precision & 0.17 & 0.17 \\
+Recall    & 0.56 & 0.53 \\
+Log-Loss  & 0.65 & 0.63 \\
 \bottomrule
 \end{tabular}
 \vspace{4pt}
 
-\raggedright\small\textit{Note.} Best GBM parameters: learning\_rate = 0.05, max\_depth = 3, n\_estimators = 100.
+\raggedright\small\textit{Note.} Best GBM parameters: learning\_rate = 0.1, max\_depth = 5, n\_estimators = 200. Low precision reflects the 11.2\% class imbalance in the UCI dataset.
 \end{table}
 
 \begin{figure}[H]
@@ -225,8 +232,8 @@ Log-Loss  & 0.62 & 0.60 \\
 \includegraphics[width=0.55\textwidth]{confusion_matrix.png}
 \caption{\textit{Confusion Matrix for the Baseline Gradient Boosting Classifier.}
 Rows represent actual class labels; columns represent predicted labels. The model
-achieves higher recall (0.80) for the readmitted class than precision (0.72),
-reflecting the class imbalance in the dataset.}
+achieves moderate recall (0.56) for the minority readmitted class against
+precision of 0.17, reflecting the severe 11.2\% class imbalance in the UCI dataset.}
 \end{figure}
 
 \section{Development of the Explainable AI Solution}
@@ -235,8 +242,8 @@ The XAI solution was implemented locally in a Jupyter notebook, mirroring the
 ``Getting Explanations Locally in Notebook'' workflow described in the Vertex AI
 Explainable AI documentation. Integrated Gradients was applied to the MLP
 classifier because IG requires a smooth, differentiable model output. The IG
-completeness property was verified empirically: the sum of attributions (0.2886)
-closely matched $f(x) - f(\text{baseline}) = 0.2892$, confirming correct
+completeness property was verified empirically: the sum of attributions ($-0.163$)
+closely matched $f(x) - f(\text{baseline}) = -0.165$, confirming correct
 implementation. Sampled Shapley was applied to the Gradient Boosting Classifier
 via SHAP KernelExplainer, and exact SHAP values were computed using TreeExplainer
 as a ground-truth reference.
@@ -246,24 +253,21 @@ as a ground-truth reference.
 \includegraphics[width=0.85\textwidth]{shap_summary_tree.png}
 \caption{\textit{Global SHAP Summary Plot (TreeExplainer, Gradient Boosting Classifier).}
 Each dot represents one test instance. Feature importance is ranked by mean
-$|$SHAP value$|$. \texttt{prior\_admissions}, \texttt{age}, and
-\texttt{length\_of\_stay} are the dominant predictors; \texttt{day\_of\_week}
-ranks last, confirming its spurious nature.}
+$|$SHAP value$|$. \texttt{number\_inpatient} (0.320), \texttt{time\_in\_hospital}
+(0.121), and \texttt{num\_lab\_procedures} (0.095) are the dominant predictors,
+consistent with established clinical readmission risk factors.}
 \end{figure}
 
 \subsection{Integrated Gradients: Varying the Number of Steps}
 
 Three step configurations were evaluated: 50, 200, and 500. All three produced
-consistent feature rankings---\texttt{prior\_admissions} (attribution $+0.211$),
-\texttt{discharge\_disposition} ($+0.093$), and \texttt{num\_medications}
-($+0.051$) as the top positive contributors---demonstrating that the MLP had
-learned clinically meaningful patterns. The L2 distance between the 50-step and
-500-step results was 0.0026, while the 200-step result was already within 0.0014
-of the 500-step solution. Inference latency scaled from 0.04~s at 50 steps to
-0.11~s at 500 steps---a $2.8\times$ increase---with only marginal attribution
-improvement beyond 200 steps. A convergence sweep across nine step counts
-confirmed a clear diminishing-return curve with an elbow near 100 steps, making
-200 steps the practical optimum for this dataset and model architecture.
+consistent feature rankings: \texttt{num\_procedures} ($+0.091$) and
+\texttt{num\_lab\_procedures} ($+0.087$) were the top positive contributors, while
+\texttt{number\_inpatient} ($-0.126$) and \texttt{num\_medications} ($-0.112$)
+were the strongest negative contributors. The L2 distance between the 50-step
+and 500-step results was 0.0053; the 200-step result was within 0.0010 of the
+500-step solution. A convergence sweep confirmed a clear diminishing-return curve
+with an elbow near 100 steps, making 200 steps the practical optimum.
 
 \begin{figure}[H]
 \centering
@@ -288,17 +292,16 @@ recommended 200-step configuration.}
 
 A secondary experiment used SHAP KernelExplainer with \texttt{nsamples} of 10,
 30, and 50---the direct analogue of the Vertex AI Sampled Shapley
-\texttt{num\_paths} parameter (Ribeiro et al., 2016). The L2 distance from the
-exact TreeExplainer result was 0.371 at $n = 10$, 0.366 at $n = 30$, and 0.367 at
-$n = 50$. The stable L2 error reflected that background dataset size matters as much as
-the number of coalitions sampled. Globally, exact
-TreeExplainer results confirmed that \texttt{prior\_admissions}
-(mean $|\text{SHAP}| = 0.558$), \texttt{age} (0.381), and
-\texttt{length\_of\_stay} (0.296) were the three dominant features---consistent
-with published clinical literature on readmission risk. Notably,
-\texttt{day\_of\_week} received the lowest attribution (0.026, rank 8 of 8), yet
-its non-zero value revealed that the model encoded a weekend coding artifact in
-the training data---a data quality issue entirely invisible without XAI.
+\texttt{num\_paths} parameter (Ribeiro et al., 2016). L2 distance from the exact
+TreeExplainer result was 0.370 at $n = 10$, 0.363 at $n = 30$, and 0.356 at
+$n = 50$, showing steady convergence as paths increase. The non-trivial residual
+error reflects that kernel-based Shapley approximations require calibration on
+large, imbalanced datasets. Globally, TreeExplainer confirmed that
+\texttt{number\_inpatient} (mean $|\text{SHAP}| = 0.320$),
+\texttt{time\_in\_hospital} (0.121), and \texttt{num\_lab\_procedures} (0.095)
+were the dominant features. \texttt{num\_procedures} and
+\texttt{number\_emergency} ranked lowest (0.053 and 0.040), indicating minimal
+incremental predictive value in this cohort.
 
 \begin{figure}[H]
 \centering
@@ -313,34 +316,33 @@ configurations; magnitude converges toward the exact values as nsamples increase
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.75\textwidth]{global_importance_spurious.png}
-\caption{\textit{Global Feature Importance with Spurious Feature Highlighted.}
-Bars represent mean absolute SHAP values across the test set. The red bar
-(\texttt{day\_of\_week}) flags the artifact feature injected into the training
-data. Its non-zero global importance confirms the model encoded this spurious
-correlation despite it ranking last overall.}
+\caption{\textit{Global Feature Importance with Low-Signal Features Highlighted.}
+Bars represent mean absolute SHAP values across the test set. Red bars flag
+\texttt{num\_procedures} and \texttt{number\_emergency} as the lowest-importance
+features, identified by XAI as contributing minimal incremental predictive signal
+beyond the other clinical predictors.}
 \end{figure}
 
 \section{Lessons Learned and Future Pipeline Implications}
 
-Several important lessons emerged from this exploration, many of which connect
-directly to predictive performance outcomes. First, the moderate AUC-ROC of 0.68
-achieved by the baseline Gradient Boosting Classifier (improved to 0.69 after grid
-search) revealed that the model had limited discriminative power---a performance
-ceiling that XAI helped explain rather than conceal. The SHAP attribution analysis showed that \texttt{prior\_admissions}
-dominated predictions (mean $|\text{SHAP}| = 0.558$) while several other features
-contributed minimally, suggesting that feature engineering---such as admission history interaction
-terms---could materially improve predictive performance in future iterations.
-XAI did not merely describe the model; it diagnosed it.
+Several important lessons emerged from this exploration. First, the AUC-ROC of
+0.65 on the real UCI dataset---with severe 11.2\% class imbalance---highlights
+that standard metrics alone are insufficient for imbalanced clinical prediction.
+XAI revealed that \texttt{number\_inpatient} dominated predictions (mean
+$|\text{SHAP}| = 0.320$) while \texttt{num\_procedures} and
+\texttt{number\_emergency} contributed minimally, suggesting that enriching the
+feature set with medication change indicators or discharge disposition codes could
+materialy improve discriminative performance. XAI did not merely describe the
+model; it diagnosed it.
 
-Second, the detection of a non-zero attribution for \texttt{day\_of\_week}
-demonstrated that the model had learned a spurious correlation from training data,
-which would silently degrade generalization on future data where weekend
-coding patterns differ. Without XAI, this predictive performance risk
-would have been entirely invisible at model evaluation time. This underscores the
-need to treat XAI as a diagnostic complement to standard evaluation metrics, not
-a substitute.
+Second, the KernelExplainer L2 error remained substantial (0.356--0.370) even
+at 50 paths, revealing that kernel-based Shapley approximations require careful
+calibration on large, imbalanced real-world datasets. Without XAI to surface
+this approximation gap, practitioners relying solely on KernelExplainer could
+misinterpret feature contributions. This underscores the need to treat XAI as a
+diagnostic complement to standard evaluation metrics, not a substitute.
 
-Third, the comparison between the best GBM (AUC-ROC 0.69) and the MLP (AUC-ROC 0.66)
+Third, the comparison between the best GBM (AUC-ROC 0.64) and the MLP (AUC-ROC 0.62)
 highlighted a performance-interpretability tradeoff: the MLP was required for
 Integrated Gradients due to its smooth output surface, yet it performed slightly
 worse. Future pipelines should incorporate both model types in parallel---the
@@ -369,6 +371,13 @@ provider roadmaps.
 Doshi-Velez, F., \& Kim, B. (2017). Towards a rigorous science of interpretable
 machine learning. \textit{arXiv preprint arXiv:1702.08608}.
 \\\small\url{https://arxiv.org/abs/1702.08608}\normalsize
+
+\noindent
+Strack, B., DeShazo, J.~P., Gennings, C., Olmo, J.~L., Ventura, S., Cios, K.~J.,
+\& Clore, J.~N. (2014). Impact of HbA1c measurement on hospital readmission rates:
+Analysis of 70{,}000 clinical database patient records.
+\textit{BioMed Research International, 2014}, Article 781670.
+\\\small\url{https://doi.org/10.1155/2014/781670}\normalsize
 
 \noindent
 Philip, R.~E. (2019, December 13). Explainability of AI: The challenges and
